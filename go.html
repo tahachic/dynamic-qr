@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
-    <title>Opening Facebook...</title>
+    <title>Opening destination...</title>
 
     <style>
         body {
@@ -24,14 +24,6 @@
             padding: 30px;
         }
 
-        h2 {
-            font-size: 22px;
-        }
-
-        p {
-            color: #666;
-        }
-
         a {
             display: inline-block;
             margin-top: 15px;
@@ -48,106 +40,212 @@
 <body>
 
 <div class="container">
-    <h2>Opening Facebook...</h2>
-    <p>Please wait while we redirect you.</p>
-
-    <a id="fallbackLink" href="#">
-        Continue to Facebook
-    </a>
+    <h2 id="title">Opening destination...</h2>
+    <p id="message">Please wait while we redirect you.</p>
+    <a id="fallbackLink" href="#">Continue to website</a>
 </div>
 
 <script>
-    // ==================================
-    // CONFIGURATION
-    // ==================================
 
-    const DESTINATION = "https://www.youtube.com/@Raklita";
+// ============================================
+// 1. CHANGE ONLY THIS URL WHENEVER YOU WANT
+// ============================================
 
-    const ANDROID_PACKAGE = "com.facebook.katana";
+const DESTINATION = "https://www.youtube.com/@Raklita";
 
-    // ==================================
-    // DEVICE DETECTION
-    // ==================================
 
-    const ua = navigator.userAgent || "";
+// ============================================
+// 2. PLATFORM DETECTION
+// ============================================
 
-    const isAndroid = /Android/i.test(ua);
+function detectPlatform(url) {
 
-    const isIOS =
-        /iPhone|iPad|iPod/i.test(ua) ||
-        (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+    const host = url.hostname.toLowerCase();
 
-    // ==================================
-    // FALLBACK
-    // ==================================
+    if (host === "facebook.com" || host.endsWith(".facebook.com") ||
+        host === "fb.com") return "facebook";
 
-    document.getElementById("fallbackLink").href = DESTINATION;
+    if (host === "youtube.com" || host.endsWith(".youtube.com") ||
+        host === "youtu.be") return "youtube";
 
-    let fallbackTimer;
+    if (host === "instagram.com" || host.endsWith(".instagram.com"))
+        return "instagram";
 
-    function fallback() {
-        if (document.hidden) return;
+    if (host === "whatsapp.com" || host.endsWith(".whatsapp.com") ||
+        host === "wa.me") return "whatsapp";
 
+    return "website";
+}
+
+
+// ============================================
+// 3. CREATE APP DESTINATION
+// ============================================
+
+function getAppTarget(platform, url) {
+
+    const encodedURL = encodeURIComponent(url.href);
+
+    switch (platform) {
+
+        case "facebook":
+            return {
+                android: "com.facebook.katana",
+                ios: "fb://facewebmodal/f?href=" + encodedURL
+            };
+
+        case "youtube":
+            return {
+                android: "com.google.android.youtube",
+                ios: "youtube://" + url.host + url.pathname +
+                     url.search + url.hash
+            };
+
+        case "instagram": {
+
+            const match = url.pathname.match(/^\/([a-zA-Z0-9._]+)\/?$/);
+
+            return {
+                android: "com.instagram.android",
+                ios: match
+                    ? "instagram://user?username=" + match[1]
+                    : null
+            };
+        }
+
+        case "whatsapp": {
+
+            const phone = url.hostname === "wa.me"
+                ? url.pathname.replace(/\//g, "")
+                : url.searchParams.get("phone");
+
+            if (phone) {
+                return {
+                    android: "com.whatsapp",
+                    ios: "whatsapp://send?phone=" +
+                         encodeURIComponent(phone)
+                };
+            }
+
+            return {
+                android: "com.whatsapp",
+                ios: "whatsapp://"
+            };
+        }
+
+        default:
+            return null;
+    }
+}
+
+
+// ============================================
+// 4. MAIN REDIRECTION ENGINE
+// ============================================
+
+const url = new URL(DESTINATION);
+
+if (url.protocol !== "https:") {
+    throw new Error("Only HTTPS destinations are supported.");
+}
+
+const platform = detectPlatform(url);
+
+const app = getAppTarget(platform, url);
+
+document.title = "Opening " + platform;
+
+document.getElementById("title").textContent =
+    "Opening " + platform.charAt(0).toUpperCase() +
+    platform.slice(1) + "...";
+
+document.getElementById("fallbackLink").href = DESTINATION;
+
+document.getElementById("fallbackLink").textContent =
+    "Continue to " + platform;
+
+
+// ============================================
+// 5. DEVICE DETECTION
+// ============================================
+
+const ua = navigator.userAgent || "";
+
+const isAndroid = /Android/i.test(ua);
+
+const isIOS =
+    /iPhone|iPad|iPod/i.test(ua) ||
+    (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+
+
+// ============================================
+// 6. FALLBACK MANAGEMENT
+// ============================================
+
+let fallbackTimer;
+
+function openWebsite() {
+    if (!document.hidden) {
         window.location.replace(DESTINATION);
     }
+}
 
-    function stopFallback() {
-        if (document.hidden) {
-            clearTimeout(fallbackTimer);
-        }
-    }
-
-    document.addEventListener("visibilitychange", stopFallback);
-
-    window.addEventListener("pagehide", () => {
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
         clearTimeout(fallbackTimer);
-    });
-
-    // ==================================
-    // ANDROID
-    // ==================================
-
-    if (isAndroid) {
-
-        const target = new URL(DESTINATION);
-
-        const androidIntent =
-            `intent://${target.host}${target.pathname}${target.search}${target.hash}` +
-            `#Intent;scheme=https;` +
-            `package=${ANDROID_PACKAGE};` +
-            `S.browser_fallback_url=${encodeURIComponent(DESTINATION)};end`;
-
-        fallbackTimer = setTimeout(fallback, 2200);
-
-        window.location.href = androidIntent;
-
     }
+});
 
-    // ==================================
-    // IPHONE / IPAD
-    // ==================================
+window.addEventListener("pagehide", () => {
+    clearTimeout(fallbackTimer);
+});
 
-    else if (isIOS) {
 
-        const iosAppUrl =
-            "fb://facewebmodal/f?href=" +
-            encodeURIComponent(DESTINATION);
+// ============================================
+// 7. ANDROID APP LAUNCH
+// ============================================
 
-        fallbackTimer = setTimeout(fallback, 1800);
+if (isAndroid && app && app.android) {
 
-        window.location.href = iosAppUrl;
+    const intent =
+        "intent://" + url.host + url.pathname +
+        url.search + url.hash +
+        "#Intent;scheme=https;" +
+        "package=" + app.android + ";" +
+        "S.browser_fallback_url=" +
+        encodeURIComponent(DESTINATION) +
+        ";end";
 
-    }
+    fallbackTimer = setTimeout(openWebsite, 2500);
 
-    // ==================================
-    // DESKTOP / OTHER DEVICES
-    // ==================================
+    window.location.href = intent;
 
-    else {
+}
 
-        fallback();
 
-    }
+// ============================================
+// 8. IPHONE APP LAUNCH
+// ============================================
+
+else if (isIOS && app && app.ios) {
+
+    fallbackTimer = setTimeout(openWebsite, 2200);
+
+    window.location.href = app.ios;
+
+}
+
+
+// ============================================
+// 9. UNKNOWN APP / WEBSITE / DESKTOP
+// ============================================
+
+else {
+
+    openWebsite();
+
+}
+
 </script>
 
 </body>
