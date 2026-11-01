@@ -1,0 +1,154 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>Opening Facebook...</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: #f5f7fb;
+            color: #222;
+            text-align: center;
+        }
+
+        .container {
+            padding: 30px;
+        }
+
+        h2 {
+            font-size: 22px;
+        }
+
+        p {
+            color: #666;
+        }
+
+        a {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 14px 25px;
+            background: #1877F2;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+    <h2>Opening Facebook...</h2>
+    <p>Please wait while we redirect you.</p>
+
+    <a id="fallbackLink" href="#">
+        Continue to Facebook
+    </a>
+</div>
+
+<script>
+    // ==================================
+    // CONFIGURATION
+    // ==================================
+
+    const DESTINATION = "https://web.facebook.com/tahachabana";
+
+    const ANDROID_PACKAGE = "com.facebook.katana";
+
+    // ==================================
+    // DEVICE DETECTION
+    // ==================================
+
+    const ua = navigator.userAgent || "";
+
+    const isAndroid = /Android/i.test(ua);
+
+    const isIOS =
+        /iPhone|iPad|iPod/i.test(ua) ||
+        (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+
+    // ==================================
+    // FALLBACK
+    // ==================================
+
+    document.getElementById("fallbackLink").href = DESTINATION;
+
+    let fallbackTimer;
+
+    function fallback() {
+        if (document.hidden) return;
+
+        window.location.replace(DESTINATION);
+    }
+
+    function stopFallback() {
+        if (document.hidden) {
+            clearTimeout(fallbackTimer);
+        }
+    }
+
+    document.addEventListener("visibilitychange", stopFallback);
+
+    window.addEventListener("pagehide", () => {
+        clearTimeout(fallbackTimer);
+    });
+
+    // ==================================
+    // ANDROID
+    // ==================================
+
+    if (isAndroid) {
+
+        const target = new URL(DESTINATION);
+
+        const androidIntent =
+            `intent://${target.host}${target.pathname}${target.search}${target.hash}` +
+            `#Intent;scheme=https;` +
+            `package=${ANDROID_PACKAGE};` +
+            `S.browser_fallback_url=${encodeURIComponent(DESTINATION)};end`;
+
+        fallbackTimer = setTimeout(fallback, 2200);
+
+        window.location.href = androidIntent;
+
+    }
+
+    // ==================================
+    // IPHONE / IPAD
+    // ==================================
+
+    else if (isIOS) {
+
+        const iosAppUrl =
+            "fb://facewebmodal/f?href=" +
+            encodeURIComponent(DESTINATION);
+
+        fallbackTimer = setTimeout(fallback, 1800);
+
+        window.location.href = iosAppUrl;
+
+    }
+
+    // ==================================
+    // DESKTOP / OTHER DEVICES
+    // ==================================
+
+    else {
+
+        fallback();
+
+    }
+</script>
+
+</body>
+</html>
