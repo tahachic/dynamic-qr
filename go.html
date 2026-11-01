@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex">
-    <title>Opening destination...</title>
+    <title>Redirecting...</title>
 
     <style>
         body {
@@ -14,8 +14,8 @@
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            background: #f5f7fb;
-            color: #222;
+            background: #f5f5f5;
+            color: #333;
             text-align: center;
         }
 
@@ -24,13 +24,8 @@
         }
 
         a {
-            display: inline-block;
-            margin-top: 15px;
-            padding: 14px 25px;
-            background: #1877F2;
-            color: white;
+            color: #1877F2;
             text-decoration: none;
-            border-radius: 8px;
             font-weight: bold;
         }
     </style>
@@ -39,249 +34,58 @@
 <body>
 
 <div class="container">
-    <h2 id="title">Opening destination...</h2>
-    <p id="message">Please wait...</p>
-    <a id="fallbackLink" href="#">Continue</a>
+    <h2>Redirecting...</h2>
+    <p>Please wait while we open your destination.</p>
+    <p>
+        <a id="manualLink" href="#">Click here if you are not redirected.</a>
+    </p>
 </div>
 
 <script>
-
-// ========================================
-// 1. LOAD CONFIGURATION
-// ========================================
-
-async function startRedirect() {
+(async function () {
 
     try {
 
-        const response = await fetch("/config.json", {
+        // Load destination from config.json
+        const response = await fetch("/config.json?t=" + Date.now(), {
             cache: "no-store"
         });
 
         if (!response.ok) {
-            throw new Error("Cannot load configuration");
+            throw new Error("Unable to load configuration.");
         }
 
         const config = await response.json();
 
-        const destination = new URL(config.destination);
+        const destination = config.destination;
 
-        if (destination.protocol !== "https:") {
-            throw new Error("Only HTTPS destinations are allowed");
+        // Validate destination
+        const url = new URL(destination);
+
+        if (!["http:", "https:"].includes(url.protocol)) {
+            throw new Error("Invalid destination URL.");
         }
 
-        launchDestination(destination);
+        // Provide a manual link as fallback
+        const manualLink = document.getElementById("manualLink");
+        manualLink.href = destination;
+
+        // Let iOS and Android handle HTTPS app links.
+        // This avoids forcing Facebook's app to open its home page.
+        window.location.replace(destination);
 
     } catch (error) {
 
-        document.getElementById("title").textContent =
-            "Configuration error";
+        console.error("Redirect error:", error);
 
-        document.getElementById("message").textContent =
-            "Please try again later.";
-
-        console.error(error);
-
-    }
-}
-
-
-// ========================================
-// 2. DETECT PLATFORM
-// ========================================
-
-function detectPlatform(url) {
-
-    const host = url.hostname.toLowerCase();
-
-    if (
-        host === "facebook.com" ||
-        host.endsWith(".facebook.com") ||
-        host === "fb.com"
-    ) return "facebook";
-
-    if (
-        host === "youtube.com" ||
-        host.endsWith(".youtube.com") ||
-        host === "youtu.be"
-    ) return "youtube";
-
-    if (
-        host === "instagram.com" ||
-        host.endsWith(".instagram.com")
-    ) return "instagram";
-
-    if (
-        host === "whatsapp.com" ||
-        host.endsWith(".whatsapp.com") ||
-        host === "wa.me"
-    ) return "whatsapp";
-
-    return "website";
-}
-
-
-// ========================================
-// 3. APP CONFIGURATION
-// ========================================
-
-function getAppTarget(platform, url) {
-
-    switch (platform) {
-
-        case "facebook":
-            return {
-                android: "com.facebook.katana",
-                ios: "fb://facewebmodal/f?href=" +
-                     encodeURIComponent(url.href)
-            };
-
-        case "youtube":
-            return {
-                android: "com.google.android.youtube",
-                ios: "youtube://" + url.host +
-                     url.pathname + url.search + url.hash
-            };
-
-        case "instagram": {
-
-            const match = url.pathname.match(
-                /^\/([a-zA-Z0-9._]+)\/?$/
-            );
-
-            return {
-                android: "com.instagram.android",
-                ios: match
-                    ? "instagram://user?username=" + match[1]
-                    : null
-            };
-        }
-
-        case "whatsapp": {
-
-            let phone = "";
-
-            if (url.hostname === "wa.me") {
-                phone = url.pathname.replace(/\//g, "");
-            } else {
-                phone = url.searchParams.get("phone") || "";
-            }
-
-            return {
-                android: "com.whatsapp",
-                ios: phone
-                    ? "whatsapp://send?phone=" +
-                      encodeURIComponent(phone)
-                    : "whatsapp://"
-            };
-        }
-
-        default:
-            return null;
-    }
-}
-
-
-// ========================================
-// 4. REDIRECTION ENGINE
-// ========================================
-
-function launchDestination(url) {
-
-    const platform = detectPlatform(url);
-    const app = getAppTarget(platform, url);
-
-    document.title = "Opening " + platform;
-
-    document.getElementById("title").textContent =
-        "Opening " + platform.charAt(0).toUpperCase() +
-        platform.slice(1) + "...";
-
-    document.getElementById("fallbackLink").href = url.href;
-
-    document.getElementById("fallbackLink").textContent =
-        "Continue to " + platform;
-
-
-    const ua = navigator.userAgent || "";
-
-    const isAndroid = /Android/i.test(ua);
-
-    const isIOS =
-        /iPhone|iPad|iPod/i.test(ua) ||
-        (/Macintosh/i.test(ua) &&
-         navigator.maxTouchPoints > 1);
-
-
-    let fallbackTimer;
-
-    function fallback() {
-
-        if (!document.hidden) {
-            window.location.replace(url.href);
-        }
+        document.querySelector(".container").innerHTML = `
+            <h2>Unable to redirect</h2>
+            <p>Please try again later.</p>
+        `;
 
     }
 
-    document.addEventListener("visibilitychange", () => {
-
-        if (document.hidden) {
-            clearTimeout(fallbackTimer);
-        }
-
-    });
-
-    window.addEventListener("pagehide", () => {
-        clearTimeout(fallbackTimer);
-    });
-
-
-    // ANDROID
-
-    if (isAndroid && app && app.android) {
-
-        const intent =
-            "intent://" + url.host + url.pathname +
-            url.search + url.hash +
-            "#Intent;scheme=https;" +
-            "package=" + app.android + ";" +
-            "S.browser_fallback_url=" +
-            encodeURIComponent(url.href) +
-            ";end";
-
-        fallbackTimer = setTimeout(fallback, 2500);
-
-        window.location.href = intent;
-
-    }
-
-    // IPHONE
-
-    else if (isIOS && app && app.ios) {
-
-        fallbackTimer = setTimeout(fallback, 2200);
-
-        window.location.href = app.ios;
-
-    }
-
-    // WEBSITE / DESKTOP / UNKNOWN APP
-
-    else {
-
-        fallback();
-
-    }
-
-}
-
-
-// ========================================
-// 5. START
-// ========================================
-
-startRedirect();
-
+})();
 </script>
 
 </body>
